@@ -1,0 +1,12 @@
+# IDE / Editor
+.vscode/
+
+# Kiro
+.kiro/
+
+# OS
+.DS_Store
+~$*
+
+# Environment
+.env

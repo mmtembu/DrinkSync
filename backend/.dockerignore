@@ -1,0 +1,6 @@
+target/
+.mvn/wrapper/maven-wrapper.jar
+.jqwik-database
+*.iml
+.idea/
+.DS_Store

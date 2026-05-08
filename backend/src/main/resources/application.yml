@@ -1,0 +1,74 @@
+spring:
+  application:
+    name: drinksync
+
+  datasource:
+    url: jdbc:postgresql://localhost:5432/smarteventbar
+    username: smarteventbar
+    password: smarteventbar
+    driver-class-name: org.postgresql.Driver
+    hikari:
+      maximum-pool-size: 10
+      minimum-idle: 5
+      idle-timeout: 300000
+      connection-timeout: 20000
+
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    open-in-view: false
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+        format_sql: true
+    show-sql: false
+
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+    baseline-on-migrate: false
+
+  jackson:
+    serialization:
+      write-dates-as-timestamps: false
+    deserialization:
+      fail-on-unknown-properties: true
+
+server:
+  port: 8080
+
+# Actuator configuration
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,metrics
+  endpoint:
+    health:
+      show-details: always
+      probes:
+        enabled: true
+  health:
+    db:
+      enabled: true
+
+# WebSocket configuration
+websocket:
+  allowed-origins: "*"
+  endpoint: /ws
+  application-destination-prefix: /app
+  broker-prefix: /topic
+
+# JWT configuration
+jwt:
+  secret: smart-event-bar-jwt-secret-key-that-is-at-least-256-bits-long-for-hs256
+  expiration-hours: 12
+
+# Logging configuration
+logging:
+  level:
+    root: INFO
+    com.smarteventbar: DEBUG
+    org.springframework.web.socket: INFO
+  pattern:
+    console: "%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg%n"

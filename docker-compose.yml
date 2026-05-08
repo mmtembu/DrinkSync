@@ -1,0 +1,118 @@
+services:
+  # --- Core app services (start fast) ---
+
+  postgres:
+    image: postgres:16-alpine
+    container_name: drinksync-db
+    environment:
+      POSTGRES_DB: smarteventbar
+      POSTGRES_USER: smarteventbar
+      POSTGRES_PASSWORD: smarteventbar
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U smarteventbar -d smarteventbar"]
+      interval: 3s
+      timeout: 3s
+      retries: 5
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile.dev
+    container_name: drinksync-frontend
+    ports:
+      - "5173:5173"
+    volumes:
+      - ./frontend/src:/app/src
+      - ./frontend/public:/app/public
+      - ./frontend/index.html:/app/index.html
+      - ./frontend/vite.config.ts:/app/vite.config.ts
+      - ./frontend/tsconfig.json:/app/tsconfig.json
+      - ./frontend/tsconfig.app.json:/app/tsconfig.app.json
+      - ./frontend/tsconfig.node.json:/app/tsconfig.node.json
+    environment:
+      VITE_API_BASE_URL: http://localhost:8080
+      VITE_WS_URL: ws://localhost:8080/ws
+    # No dependencies — starts immediately
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile.dev
+    container_name: drinksync-backend
+    ports:
+      - "8080:8080"
+      - "5005:5005"
+    volumes:
+      - ./backend/src:/app/src
+      - ./backend/pom.xml:/app/pom.xml
+      - backend_m2_cache:/root/.m2
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/smarteventbar
+      SPRING_DATASOURCE_USERNAME: smarteventbar
+      SPRING_DATASOURCE_PASSWORD: smarteventbar
+      SPRING_PROFILES_ACTIVE: docker
+      OTEL_SERVICE_NAME: drinksync-backend
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4317
+      OTEL_EXPORTER_OTLP_PROTOCOL: grpc
+      OTEL_LOGS_EXPORTER: otlp
+      OTEL_METRICS_EXPORTER: otlp
+      OTEL_TRACES_EXPORTER: otlp
+      OTEL_RESOURCE_ATTRIBUTES: service.name=drinksync-backend,service.version=0.0.1
+    depends_on:
+      postgres:
+        condition: service_healthy
+      # OTel collector is best-effort — backend starts even if collector isn't ready yet.
+      # The OTel Java agent retries connections automatically.
+
+  # --- Observability services (can start slower) ---
+
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:8.15.0
+    container_name: drinksync-elasticsearch
+    environment:
+      - discovery.type=single-node
+      - xpack.security.enabled=false
+      - ES_JAVA_OPTS=-Xms256m -Xmx256m
+    ports:
+      - "9200:9200"
+    volumes:
+      - elasticsearch_data:/usr/share/elasticsearch/data
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:9200/_cluster/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 15
+      start_period: 30s
+
+  otel-collector:
+    image: otel/opentelemetry-collector-contrib:0.108.0
+    container_name: drinksync-otel-collector
+    command: ["--config=/etc/otel-collector-config.yaml"]
+    volumes:
+      - ./observability/otel-collector-config.yaml:/etc/otel-collector-config.yaml
+    ports:
+      - "4317:4317"
+      - "4318:4318"
+    depends_on:
+      elasticsearch:
+        condition: service_healthy
+
+  kibana:
+    image: docker.elastic.co/kibana/kibana:8.15.0
+    container_name: drinksync-kibana
+    environment:
+      - ELASTICSEARCH_HOSTS=http://elasticsearch:9200
+    ports:
+      - "5601:5601"
+    depends_on:
+      elasticsearch:
+        condition: service_healthy
+
+volumes:
+  postgres_data:
+  backend_m2_cache:
+  elasticsearch_data:

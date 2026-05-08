@@ -1,0 +1,15 @@
+{
+  "compilerOptions": {
+    "target": "es2023",
+    "lib": ["ES2023", "DOM"],
+    "module": "esnext",
+    "moduleResolution": "bundler",
+    "strict": true,
+    "skipLibCheck": true,
+    "noEmit": true,
+    "verbatimModuleSyntax": false,
+    "esModuleInterop": true,
+    "allowImportingTsExtensions": true
+  },
+  "include": ["e2e/**/*.ts"]
+}
