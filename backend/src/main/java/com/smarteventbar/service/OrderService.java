@@ -17,6 +17,8 @@ public interface OrderService {
 
     CustomerOrder checkout(Long orderId, String sessionId);
 
+    CustomerOrder checkout(Long orderId, String sessionId, String customerPhone, Boolean whatsappOptIn);
+
     CustomerOrder confirmPayment(Long orderId, String sessionId, UUID idempotencyKey);
 
     CustomerOrder cancelOrder(Long orderId, String sessionId);

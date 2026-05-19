@@ -11,8 +11,8 @@ export const orderApi = {
   updateOrderItems: (orderId: number, items: OrderItemRequest[], sessionId: string) =>
     apiClient.put<Order>(`/api/orders/${orderId}/items`, items, { sessionId }),
 
-  checkout: (orderId: number, sessionId: string) =>
-    apiClient.post<Order>(`/api/orders/${orderId}/checkout`, undefined, { sessionId }),
+  checkout: (orderId: number, sessionId: string, body?: { customerPhone?: string; whatsappOptIn?: boolean }) =>
+    apiClient.post<Order>(`/api/orders/${orderId}/checkout`, body, { sessionId }),
 
   pay: (orderId: number, idempotencyKey: string, sessionId: string) =>
     apiClient.post<Order>(`/api/orders/${orderId}/pay`, undefined, {

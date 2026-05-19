@@ -15,3 +15,13 @@ spring:
 jwt:
   secret: smart-event-bar-jwt-secret-key-that-is-at-least-256-bits-long-for-hs256
   expiration-hours: 12
+
+whatsapp:
+  enabled: true
+  phone-number-id: "test-phone-id"
+  access-token: "mock"
+  verify-token: "test-verify-token"
+  business-account-id: "test-account-id"
+  app-secret: "test-app-secret"
+  send-timeout-seconds: 2
+  max-send-rate-per-second: 1000

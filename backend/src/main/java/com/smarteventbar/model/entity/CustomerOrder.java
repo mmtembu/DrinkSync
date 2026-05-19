@@ -59,6 +59,15 @@ public class CustomerOrder {
     @Column(name = "updated_at", nullable = false)
     private LocalDateTime updatedAt;
 
+    @Column(name = "customer_phone", length = 20)
+    private String customerPhone;
+
+    @Column(name = "whatsapp_opt_in", nullable = false)
+    private boolean whatsappOptIn = false;
+
+    @Column(name = "whatsapp_message_status", length = 20)
+    private String whatsappMessageStatus;
+
     @OneToMany(mappedBy = "order", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.EAGER)
     private List<OrderItem> orderItems = new ArrayList<>();
 
@@ -171,5 +180,29 @@ public class CustomerOrder {
 
     public void setStateHistory(List<OrderStateHistory> stateHistory) {
         this.stateHistory = stateHistory;
+    }
+
+    public String getCustomerPhone() {
+        return customerPhone;
+    }
+
+    public void setCustomerPhone(String customerPhone) {
+        this.customerPhone = customerPhone;
+    }
+
+    public boolean isWhatsappOptIn() {
+        return whatsappOptIn;
+    }
+
+    public void setWhatsappOptIn(boolean whatsappOptIn) {
+        this.whatsappOptIn = whatsappOptIn;
+    }
+
+    public String getWhatsappMessageStatus() {
+        return whatsappMessageStatus;
+    }
+
+    public void setWhatsappMessageStatus(String whatsappMessageStatus) {
+        this.whatsappMessageStatus = whatsappMessageStatus;
     }
 }

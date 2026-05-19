@@ -1,12 +1,15 @@
 package com.smarteventbar.controller;
 
 import com.smarteventbar.config.JwtAuthFilter;
+import com.smarteventbar.dto.CheckoutRequest;
 import com.smarteventbar.dto.OrderItemRequest;
 import com.smarteventbar.dto.OrderResponse;
 import com.smarteventbar.dto.StateTransitionRequest;
 import com.smarteventbar.model.entity.CustomerOrder;
 import com.smarteventbar.model.enums.OrderState;
 import com.smarteventbar.service.OrderService;
+import com.smarteventbar.validation.PhoneNumberValidator;
+import com.smarteventbar.validation.ValidationResult;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
@@ -23,9 +26,11 @@ public class OrderController {
     private static final String SESSION_ID_HEADER = "X-Session-Id";
 
     private final OrderService orderService;
+    private final PhoneNumberValidator phoneNumberValidator;
 
-    public OrderController(OrderService orderService) {
+    public OrderController(OrderService orderService, PhoneNumberValidator phoneNumberValidator) {
         this.orderService = orderService;
+        this.phoneNumberValidator = phoneNumberValidator;
     }
 
     @PostMapping("/stations/{stationId}/orders")
@@ -57,8 +62,26 @@ public class OrderController {
     @PostMapping("/orders/{orderId}/checkout")
     public ResponseEntity<OrderResponse> checkout(
             @PathVariable Long orderId,
-            @RequestHeader(SESSION_ID_HEADER) String sessionId) {
-        CustomerOrder order = orderService.checkout(orderId, sessionId);
+            @RequestHeader(SESSION_ID_HEADER) String sessionId,
+            @RequestBody(required = false) CheckoutRequest checkoutRequest) {
+
+        String customerPhone = null;
+        Boolean whatsappOptIn = null;
+
+        if (checkoutRequest != null) {
+            customerPhone = checkoutRequest.getCustomerPhone();
+            whatsappOptIn = checkoutRequest.getWhatsappOptIn();
+        }
+
+        // Validate phone number format if provided
+        if (customerPhone != null && !customerPhone.isBlank()) {
+            ValidationResult validationResult = phoneNumberValidator.validate(customerPhone);
+            if (!validationResult.valid()) {
+                throw new IllegalArgumentException(validationResult.errorMessage());
+            }
+        }
+
+        CustomerOrder order = orderService.checkout(orderId, sessionId, customerPhone, whatsappOptIn);
         return ResponseEntity.ok(OrderResponse.fromEntity(order));
     }
 

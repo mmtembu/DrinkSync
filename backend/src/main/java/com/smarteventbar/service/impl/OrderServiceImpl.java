@@ -6,6 +6,7 @@ import com.smarteventbar.model.enums.CupOption;
 import com.smarteventbar.model.enums.OrderItemType;
 import com.smarteventbar.model.enums.OrderState;
 import com.smarteventbar.model.enums.TransitionTrigger;
+import com.smarteventbar.notification.NotificationService;
 import com.smarteventbar.repository.*;
 import com.smarteventbar.service.*;
 import jakarta.persistence.EntityNotFoundException;
@@ -15,6 +16,8 @@ import org.slf4j.MDC;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -39,6 +42,7 @@ public class OrderServiceImpl implements OrderService {
     private final VisualOrderNumberService visualOrderNumberService;
     private final SessionService sessionService;
     private final SimpMessagingTemplate messagingTemplate;
+    private final NotificationService notificationService;
 
     public OrderServiceImpl(OrderRepository orderRepository,
                             OrderItemRepository orderItemRepository,
@@ -53,7 +57,8 @@ public class OrderServiceImpl implements OrderService {
                             QueueService queueService,
                             VisualOrderNumberService visualOrderNumberService,
                             SessionService sessionService,
-                            SimpMessagingTemplate messagingTemplate) {
+                            SimpMessagingTemplate messagingTemplate,
+                            NotificationService notificationService) {
         this.orderRepository = orderRepository;
         this.orderItemRepository = orderItemRepository;
         this.stationRepository = stationRepository;
@@ -68,6 +73,7 @@ public class OrderServiceImpl implements OrderService {
         this.visualOrderNumberService = visualOrderNumberService;
         this.sessionService = sessionService;
         this.messagingTemplate = messagingTemplate;
+        this.notificationService = notificationService;
     }
 
     @Override
@@ -132,9 +138,43 @@ public class OrderServiceImpl implements OrderService {
     @Override
     @Transactional
     public CustomerOrder checkout(Long orderId, String sessionId) {
+        return checkout(orderId, sessionId, null, null);
+    }
+
+    @Override
+    @Transactional
+    public CustomerOrder checkout(Long orderId, String sessionId, String customerPhone, Boolean whatsappOptIn) {
         CustomerOrder order = getOrderForSession(orderId, sessionId);
 
         stateMachine.validateTransition(order.getState(), OrderState.AWAITING_PAYMENT);
+
+        // Resolve phone and opt-in: use provided values, or pre-fill from session
+        CustomerSession session = order.getSession();
+        String resolvedPhone = customerPhone;
+        boolean resolvedOptIn = whatsappOptIn != null ? whatsappOptIn : false;
+
+        if ((resolvedPhone == null || resolvedPhone.isBlank()) && session != null) {
+            // Pre-fill from session values
+            resolvedPhone = session.getCustomerPhone();
+            if (whatsappOptIn == null && session.isWhatsappOptIn()) {
+                resolvedOptIn = true;
+            }
+        }
+
+        // Store phone and opt-in on the Order entity
+        if (resolvedPhone != null && !resolvedPhone.isBlank()) {
+            order.setCustomerPhone(resolvedPhone);
+        }
+        order.setWhatsappOptIn(resolvedOptIn);
+
+        // Store phone and opt-in on the Session entity (update with latest values)
+        if (session != null) {
+            if (resolvedPhone != null && !resolvedPhone.isBlank()) {
+                session.setCustomerPhone(resolvedPhone);
+            }
+            session.setWhatsappOptIn(resolvedOptIn);
+            sessionRepository.save(session);
+        }
 
         OrderState previousState = order.getState();
         order.setState(OrderState.AWAITING_PAYMENT);
@@ -188,6 +228,10 @@ public class OrderServiceImpl implements OrderService {
         order = orderRepository.save(order);
         broadcastOrderUpdate(order);
 
+        // Dispatch notification after transaction commits (outside transaction boundary)
+        final CustomerOrder confirmedOrder = order;
+        registerAfterCommitNotification(() -> notificationService.notifyOrderConfirmed(confirmedOrder));
+
         MDC.put("orderId", orderId.toString());
         log.info("Payment confirmed: orderId={} queuePosition={} visualNumber={}",
                 orderId, queuePosition, order.getVisualOrderNumber());
@@ -236,6 +280,14 @@ public class OrderServiceImpl implements OrderService {
 
         order = orderRepository.save(order);
         broadcastOrderUpdate(order);
+
+        // Dispatch notification after transaction commits (outside transaction boundary)
+        final CustomerOrder transitionedOrder = order;
+        if (targetState == OrderState.READY) {
+            registerAfterCommitNotification(() -> notificationService.notifyOrderReady(transitionedOrder));
+        } else if (targetState == OrderState.COLLECTED) {
+            registerAfterCommitNotification(() -> notificationService.notifyOrderCollected(transitionedOrder));
+        }
 
         MDC.put("orderId", orderId.toString());
         log.info("Order state transition: orderId={} fromState={} toState={} trigger=VENDOR",
@@ -371,6 +423,34 @@ public class OrderServiceImpl implements OrderService {
                     "/topic/orders/" + order.getId(), response);
         } catch (Exception e) {
             log.error("Failed to broadcast order update for order {}", order.getId(), e);
+        }
+    }
+
+    /**
+     * Registers a callback to be executed after the current transaction commits successfully.
+     * This ensures notification dispatch happens outside the transaction boundary,
+     * so notification failures cannot cause a transaction rollback, and notifications
+     * are not sent if the transaction rolls back.
+     */
+    private void registerAfterCommitNotification(Runnable notificationAction) {
+        if (TransactionSynchronizationManager.isSynchronizationActive()) {
+            TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+                @Override
+                public void afterCommit() {
+                    try {
+                        notificationAction.run();
+                    } catch (Exception e) {
+                        log.error("Failed to dispatch notification after commit: {}", e.getMessage(), e);
+                    }
+                }
+            });
+        } else {
+            // No active transaction synchronization — execute directly (e.g., in tests)
+            try {
+                notificationAction.run();
+            } catch (Exception e) {
+                log.error("Failed to dispatch notification (no active transaction): {}", e.getMessage(), e);
+            }
         }
     }
 }

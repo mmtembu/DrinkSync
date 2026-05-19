@@ -13,6 +13,7 @@ import org.springframework.web.filter.OncePerRequestFilter;
 
 import java.io.IOException;
 import java.util.List;
+import java.util.Set;
 
 /**
  * JWT authentication filter for vendor endpoints.
@@ -33,6 +34,15 @@ public class JwtAuthFilter extends OncePerRequestFilter {
     public static final String STATION_ID_ATTRIBUTE = "authenticatedStationId";
 
     private final AuthService authService;
+
+    /**
+     * Path prefixes that are explicitly excluded from any authentication.
+     * These endpoints are publicly accessible (e.g., webhook callbacks from external services).
+     * Validates: Requirements 6.3, 7.5
+     */
+    private static final Set<String> PUBLIC_PATH_PREFIXES = Set.of(
+            "/api/webhooks/whatsapp"
+    );
 
     /**
      * Each entry defines a vendor-protected route pattern.
@@ -71,6 +81,12 @@ public class JwtAuthFilter extends OncePerRequestFilter {
     protected boolean shouldNotFilter(HttpServletRequest request) {
         String method = request.getMethod();
         String path = request.getRequestURI();
+
+        // Explicitly skip authentication for public endpoints (e.g., webhooks)
+        if (isPublicEndpoint(path)) {
+            return true;
+        }
+
         return !isVendorEndpoint(method, path);
     }
 
@@ -107,6 +123,19 @@ public class JwtAuthFilter extends OncePerRequestFilter {
                 stationId, request.getMethod(), request.getRequestURI());
 
         filterChain.doFilter(request, response);
+    }
+
+    /**
+     * Checks whether the given path is a public endpoint that should bypass authentication entirely.
+     * Uses prefix matching to cover all sub-paths (e.g., /api/webhooks/whatsapp and /api/webhooks/whatsapp/anything).
+     */
+    private boolean isPublicEndpoint(String path) {
+        for (String prefix : PUBLIC_PATH_PREFIXES) {
+            if (path.equals(prefix) || path.startsWith(prefix + "/")) {
+                return true;
+            }
+        }
+        return false;
     }
 
     /**
