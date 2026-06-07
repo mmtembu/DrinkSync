@@ -1,0 +1,50 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: postgres
+  namespace: drinksync
+  labels:
+    app.kubernetes.io/name: postgres
+    app.kubernetes.io/part-of: drinksync
+spec:
+  type: ClusterIP
+  ports:
+    - port: 5432
+      targetPort: 5432
+      protocol: TCP
+  selector:
+    app: postgres
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: backend
+  namespace: drinksync
+  labels:
+    app.kubernetes.io/name: backend
+    app.kubernetes.io/part-of: drinksync
+spec:
+  type: ClusterIP
+  ports:
+    - port: 8080
+      targetPort: 8080
+      protocol: TCP
+  selector:
+    app: backend
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: frontend
+  namespace: drinksync
+  labels:
+    app.kubernetes.io/name: frontend
+    app.kubernetes.io/part-of: drinksync
+spec:
+  type: ClusterIP
+  ports:
+    - port: 80
+      targetPort: 80
+      protocol: TCP
+  selector:
+    app: frontend

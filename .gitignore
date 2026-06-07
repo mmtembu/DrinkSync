@@ -10,3 +10,6 @@
 
 # Environment
 .env
+
+# Kubernetes secrets (never commit real secrets)
+k8s/secrets-real.yaml
