@@ -20,7 +20,7 @@ export function useStationMenu(stationId?: number) {
       try {
         localStorage.setItem(MENU_CACHE_KEY + stationId, JSON.stringify(data));
       } catch { /* ignore storage errors */ }
-    } catch (e: any) {
+    } catch (e: unknown) {
       // Try cached data
       try {
         const cached = localStorage.getItem(MENU_CACHE_KEY + stationId);
@@ -30,14 +30,21 @@ export function useStationMenu(stationId?: number) {
           return;
         }
       } catch { /* ignore */ }
-      setError(e.message || 'Failed to load menu');
+      const err = e as { message?: string };
+      setError(err.message || 'Failed to load menu');
     } finally {
       setLoading(false);
     }
   }, [stationId]);
 
   useEffect(() => {
-    fetchMenu();
+    let cancelled = false;
+    if (stationId) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      fetchMenu().then(() => { if (cancelled) return; });
+    }
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [fetchMenu]);
 
   return { menu, loading, error, refetch: fetchMenu };

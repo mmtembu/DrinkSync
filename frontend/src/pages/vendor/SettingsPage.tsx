@@ -36,8 +36,9 @@ export function SettingsPage() {
     try {
       await stationApi.setCupPrice(stationId, price, token);
       setSuccess('Cup price updated');
-    } catch (e: any) {
-      setError(e.body?.message || e.message);
+    } catch (e: unknown) {
+      const err = e as { body?: { message?: string }; message?: string };
+      setError(err.body?.message || err.message || 'Failed to update cup price');
     }
   };
 
@@ -50,8 +51,9 @@ export function SettingsPage() {
     try {
       await stationApi.setPickupWindow(stationId, minutes, token);
       setSuccess('Pickup window updated');
-    } catch (e: any) {
-      setError(e.body?.message || e.message);
+    } catch (e: unknown) {
+      const err = e as { body?: { message?: string }; message?: string };
+      setError(err.body?.message || err.message || 'Failed to update pickup window');
     }
   };
 

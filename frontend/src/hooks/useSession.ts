@@ -4,6 +4,7 @@ import type { Session } from '../types/session';
 
 const SESSION_KEY = 'smart-event-bar-session-id';
 
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 export function useSession(_stationId?: number) {
   const [sessionId, setSessionId] = useState<string | null>(() =>
     localStorage.getItem(SESSION_KEY)
@@ -21,37 +22,36 @@ export function useSession(_stationId?: number) {
       setSessionId(newSession.sessionId);
       setSession(newSession);
       return newSession;
-    } catch (e: any) {
-      setError(e.message);
+    } catch (e: unknown) {
+      const err = e as { message?: string };
+      setError(err.message ?? 'Failed to create session');
       return null;
     } finally {
       setLoading(false);
     }
   }, []);
 
-  const loadSession = useCallback(async () => {
+  useEffect(() => {
     if (!sessionId) return;
+    let cancelled = false;
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setLoading(true);
-    try {
-      const s = await sessionApi.getSession(sessionId);
-      setSession(s);
-    } catch (e: any) {
-      if (e.status === 404 || e.status === 410) {
+    sessionApi.getSession(sessionId).then((s) => {
+      if (!cancelled) setSession(s);
+    }).catch((e: unknown) => {
+      if (cancelled) return;
+      const err = e as { status?: number; message?: string };
+      if (err.status === 404 || err.status === 410) {
         localStorage.removeItem(SESSION_KEY);
         setSessionId(null);
         setSession(null);
       }
-      setError(e.message);
-    } finally {
-      setLoading(false);
-    }
+      setError(err.message ?? 'Failed to load session');
+    }).finally(() => {
+      if (!cancelled) setLoading(false);
+    });
+    return () => { cancelled = true; };
   }, [sessionId]);
-
-  useEffect(() => {
-    if (sessionId) {
-      loadSession();
-    }
-  }, [sessionId, loadSession]);
 
   const ensureSession = useCallback(async (stId: number) => {
     if (sessionId) return sessionId;

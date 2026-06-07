@@ -152,8 +152,8 @@ describe('CheckoutPage - WhatsApp Opt-In Integration', () => {
   it('handles 400 validation error for invalid phone and displays to user', async () => {
     const user = userEvent.setup();
     const error = new Error('Invalid phone number format: must be E.164');
-    (error as any).status = 400;
-    (error as any).body = { message: 'Invalid phone number format: must be E.164' };
+    (error as Error & { status: number }).status = 400;
+    (error as Error & { body: { message: string } }).body = { message: 'Invalid phone number format: must be E.164' };
     vi.mocked(orderApi.checkout).mockRejectedValue(error);
 
     renderCheckoutPage();
@@ -180,8 +180,8 @@ describe('CheckoutPage - WhatsApp Opt-In Integration', () => {
   it('shows general error for non-phone-related 400 errors', async () => {
     const user = userEvent.setup();
     const error = new Error('Order cannot be checked out');
-    (error as any).status = 400;
-    (error as any).body = { message: 'Order cannot be checked out' };
+    (error as Error & { status: number }).status = 400;
+    (error as Error & { body: { message: string } }).body = { message: 'Order cannot be checked out' };
     vi.mocked(orderApi.checkout).mockRejectedValue(error);
 
     renderCheckoutPage();

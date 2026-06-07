@@ -29,8 +29,8 @@ async function request<T>(path: string, options: RequestOptions = {}): Promise<T
   if (!response.ok) {
     const errorBody = await response.json().catch(() => ({ message: response.statusText }));
     const error = new Error(errorBody.message || `Request failed: ${response.status}`);
-    (error as any).status = response.status;
-    (error as any).body = errorBody;
+    (error as Error & { status: number }).status = response.status;
+    (error as Error & { body: unknown }).body = errorBody;
     throw error;
   }
 

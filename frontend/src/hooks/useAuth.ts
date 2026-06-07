@@ -32,8 +32,9 @@ export function useAuth() {
       setToken(response.token);
       setStationId(response.stationId);
       return response;
-    } catch (e: any) {
-      setError(e.body?.message || e.message || 'Login failed');
+    } catch (e: unknown) {
+      const err = e as { body?: { message?: string }; message?: string };
+      setError(err.body?.message || err.message || 'Login failed');
       return null;
     } finally {
       setLoading(false);

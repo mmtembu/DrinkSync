@@ -2,10 +2,8 @@ import {
   test,
   expect,
   setSessionInStorage,
-  clearSession,
   getSessionFromStorage,
   waitForMenuLoaded,
-  customDrinkOrderItem,
   premadeOrderItem,
 } from './helpers/fixtures';
 
@@ -187,8 +185,8 @@ test.describe('Multi-Order Support', () => {
 
     // Place 3 orders via API (all go through to PAID)
     const order1 = await api.createAndPayOrder(stationId, [premadeOrderItem(premadeId)], session.sessionId);
-    const order2 = await api.createAndPayOrder(stationId, [premadeOrderItem(premadeId)], session.sessionId);
-    const order3 = await api.createAndPayOrder(stationId, [premadeOrderItem(premadeId)], session.sessionId);
+    await api.createAndPayOrder(stationId, [premadeOrderItem(premadeId)], session.sessionId);
+    await api.createAndPayOrder(stationId, [premadeOrderItem(premadeId)], session.sessionId);
 
     // Navigate to tracking page
     await page.goto(`/station/${stationId}`);

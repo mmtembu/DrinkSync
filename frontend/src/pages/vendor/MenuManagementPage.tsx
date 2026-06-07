@@ -38,8 +38,9 @@ export function MenuManagementPage() {
       setNewItemPrice('');
       setNewItemDesc('');
       refetch();
-    } catch (e: any) {
-      setError(e.body?.message || e.message);
+    } catch (e: unknown) {
+      const err = e as { body?: { message?: string }; message?: string };
+      setError(err.body?.message || err.message || 'Failed to create item');
     }
   };
 
@@ -149,7 +150,7 @@ export function MenuManagementPage() {
               <span style={{ fontWeight: 600, color: 'var(--text-primary)' }}>{item.name}</span>
               {'description' in item && (
                 <span style={{ color: 'var(--text-muted)', marginLeft: 8, fontSize: '0.85rem' }}>
-                  {(item as any).description}
+                  {(item as { description?: string }).description}
                 </span>
               )}
               <span style={{ color: 'var(--color-success)', marginLeft: 8, fontWeight: 500 }}>

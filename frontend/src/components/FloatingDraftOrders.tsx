@@ -27,8 +27,9 @@ export function FloatingDraftOrders({ stationId, sessionId }: Props) {
   }, [sessionId]);
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     fetchOrders();
-    const interval = setInterval(fetchOrders, 5000);
+    const interval = setInterval(() => { fetchOrders(); }, 5000);
     return () => clearInterval(interval);
   }, [fetchOrders]);
 
