@@ -47,7 +47,7 @@ import static org.junit.jupiter.api.Assertions.*;
  * Validates: Requirements 5.1, 7.1
  */
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
-@ActiveProfiles("integration")
+@ActiveProfiles("test")
 class WebSocketDeliveryIntegrationTest {
 
     @LocalServerPort

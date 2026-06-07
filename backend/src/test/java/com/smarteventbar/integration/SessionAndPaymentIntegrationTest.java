@@ -37,7 +37,7 @@ import static org.junit.jupiter.api.Assertions.*;
  * Validates: Requirements 16.4, 16.6, 16.8, 18.2, 18.3, 18.4
  */
 @SpringBootTest
-@ActiveProfiles("integration")
+@ActiveProfiles("test")
 @Transactional
 class SessionAndPaymentIntegrationTest {
 
