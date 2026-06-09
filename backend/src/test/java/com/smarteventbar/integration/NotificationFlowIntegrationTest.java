@@ -14,9 +14,13 @@ import org.springframework.test.context.ActiveProfiles;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
-import java.time.LocalDateTime;
 import java.util.List;
 import java.util.UUID;
+
+import org.springframework.core.task.SyncTaskExecutor;
+import org.springframework.boot.test.context.TestConfiguration;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Primary;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -32,7 +36,21 @@ import static org.junit.jupiter.api.Assertions.*;
 @SpringBootTest
 @ActiveProfiles("test")
 @Transactional
+@org.springframework.context.annotation.Import(NotificationFlowIntegrationTest.SyncExecutorConfig.class)
 class NotificationFlowIntegrationTest {
+
+    /**
+     * Override the async executor to be synchronous in tests so that
+     * notification processing completes within the same thread/transaction.
+     */
+    @TestConfiguration
+    static class SyncExecutorConfig {
+        @Bean("notificationExecutor")
+        @Primary
+        public java.util.concurrent.Executor notificationExecutor() {
+            return new SyncTaskExecutor();
+        }
+    }
 
     @Autowired
     private OrderService orderService;
