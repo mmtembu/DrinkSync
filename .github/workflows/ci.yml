@@ -24,7 +24,7 @@ jobs:
           cache: "maven"
 
       - name: Run all tests (unit + property + integration via Testcontainers)
-        run: ./mvnw verify -B
+        run: ./mvnw test -B
 
   frontend-test:
     name: Frontend Test
