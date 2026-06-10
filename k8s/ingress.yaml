@@ -1,0 +1,48 @@
+# Traefik IngressRoute for k3s (default ingress controller)
+# Supports WebSocket upgrades for /ws endpoint
+---
+apiVersion: traefik.io/v1alpha1
+kind: Middleware
+metadata:
+  name: websocket-headers
+  namespace: drinksync
+spec:
+  headers:
+    customRequestHeaders:
+      X-Forwarded-Proto: "https"
+---
+apiVersion: traefik.io/v1alpha1
+kind: IngressRoute
+metadata:
+  name: drinksync-http
+  namespace: drinksync
+  labels:
+    app.kubernetes.io/part-of: drinksync
+spec:
+  entryPoints:
+    - web
+  routes:
+    # Backend API routes
+    - match: (Host(`dev.manga-corp.co.za`) || Host(`154.66.197.77`)) && PathPrefix(`/api`)
+      kind: Rule
+      services:
+        - name: backend
+          port: 8080
+    # WebSocket route
+    - match: (Host(`dev.manga-corp.co.za`) || Host(`154.66.197.77`)) && PathPrefix(`/ws`)
+      kind: Rule
+      services:
+        - name: backend
+          port: 8080
+    # Actuator health (for external monitoring)
+    - match: (Host(`dev.manga-corp.co.za`) || Host(`154.66.197.77`)) && PathPrefix(`/actuator/health`)
+      kind: Rule
+      services:
+        - name: backend
+          port: 8080
+    # Frontend (catch-all — must be last)
+    - match: Host(`dev.manga-corp.co.za`) || Host(`154.66.197.77`)
+      kind: Rule
+      services:
+        - name: frontend
+          port: 80

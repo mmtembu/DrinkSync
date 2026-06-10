@@ -33,7 +33,7 @@ import static org.junit.jupiter.api.Assertions.*;
  * Validates: Requirements 4.1, 4.3, 8.1, 8.2, 8.3, 10.1, 10.2, 13.1, 15.1
  */
 @SpringBootTest
-@ActiveProfiles("integration")
+@ActiveProfiles("test")
 @Transactional
 class OrderLifecycleIntegrationTest {
 

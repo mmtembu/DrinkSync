@@ -41,7 +41,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  * Validates: Requirements 12.1, 12.3, 12.4, 17.1, 17.6, 20.1, 20.6
  */
 @SpringBootTest
-@ActiveProfiles("integration")
+@ActiveProfiles("test")
 @AutoConfigureMockMvc
 @DirtiesContext(classMode = DirtiesContext.ClassMode.AFTER_CLASS)
 class AuthAndObservabilityIntegrationTest {

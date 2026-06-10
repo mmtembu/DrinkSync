@@ -18,5 +18,5 @@ export function useWebSocket() {
     };
   }, []);
 
-  return { connected, client: clientRef.current };
+  return { connected, clientRef };
 }

@@ -1,0 +1,20 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: backend-config
+  namespace: drinksync
+  labels:
+    app.kubernetes.io/name: backend
+    app.kubernetes.io/part-of: drinksync
+data:
+  SPRING_DATASOURCE_URL: "jdbc:postgresql://postgres:5432/smarteventbar"
+  SPRING_PROFILES_ACTIVE: "production"
+  SERVER_PORT: "8080"
+  WHATSAPP_ENABLED: "false"
+  SPRING_JPA_HIBERNATE_DDL_AUTO: "validate"
+  SPRING_JPA_SHOW_SQL: "false"
+  SPRING_FLYWAY_ENABLED: "true"
+  MANAGEMENT_ENDPOINTS_WEB_EXPOSURE_INCLUDE: "health,metrics"
+  MANAGEMENT_ENDPOINT_HEALTH_PROBES_ENABLED: "true"
+  LOGGING_LEVEL_ROOT: "INFO"
+  LOGGING_LEVEL_COM_SMARTEVENTBAR: "INFO"

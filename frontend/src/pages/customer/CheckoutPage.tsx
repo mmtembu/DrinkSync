@@ -44,8 +44,16 @@ export function CheckoutPage() {
 
   useEffect(() => {
     if (sessionId && oId) {
-      setLoading(true);
-      orderApi.getOrder(oId, sessionId).then(setOrder).catch((e) => setError(e.message)).finally(() => setLoading(false));
+      let cancelled = false;
+      orderApi.getOrder(oId, sessionId).then((data) => {
+        if (!cancelled) setOrder(data);
+      }).catch((e: unknown) => {
+        if (!cancelled) {
+          const err = e as { message?: string };
+          setError(err.message ?? 'Failed to load order');
+        }
+      });
+      return () => { cancelled = true; };
     }
   }, [oId, sessionId]);
 
@@ -70,9 +78,10 @@ export function CheckoutPage() {
         sessionStorage.setItem(WHATSAPP_PHONE_KEY, whatsAppData.customerPhone);
       }
       sessionStorage.setItem(WHATSAPP_OPTIN_KEY, String(whatsAppData.whatsappOptIn));
-    } catch (e: any) {
-      const status = e.status;
-      const message = e.body?.message || e.message;
+    } catch (e: unknown) {
+      const err = e as { status?: number; body?: { message?: string }; message?: string };
+      const status = err.status;
+      const message = err.body?.message || err.message || 'Checkout failed';
       // Handle 400 validation errors (e.g. invalid phone format) from backend
       if (status === 400 && message && message.toLowerCase().includes('phone')) {
         setWhatsAppError(message);
@@ -93,8 +102,9 @@ export function CheckoutPage() {
       const updated = await orderApi.pay(order.id, key, sessionId);
       setOrder(updated);
       navigate(`/station/${stId}/tracking`);
-    } catch (e: any) {
-      setError(e.body?.message || e.message || 'Payment failed. Please try again.');
+    } catch (e: unknown) {
+      const err = e as { body?: { message?: string }; message?: string };
+      setError(err.body?.message || err.message || 'Payment failed. Please try again.');
     } finally {
       setPaymentLoading(false);
     }
@@ -105,8 +115,9 @@ export function CheckoutPage() {
     try {
       await orderApi.cancel(order.id, sessionId);
       navigate(`/station/${stId}`);
-    } catch (e: any) {
-      setError(e.body?.message || e.message);
+    } catch (e: unknown) {
+      const err = e as { body?: { message?: string }; message?: string };
+      setError(err.body?.message || err.message || 'Cancel failed');
     }
   };
 

@@ -1,0 +1,209 @@
+# ============================================
+# Database Health Check CronJob
+# Runs every 5 minutes, logs results to stdout
+# View results: kubectl logs job/<job-name> -n drinksync
+# ============================================
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: db-health-check
+  namespace: drinksync
+  labels:
+    app.kubernetes.io/name: db-health-check
+    app.kubernetes.io/part-of: drinksync
+spec:
+  # Run every 5 minutes
+  schedule: "*/5 * * * *"
+  # Keep last 3 successful and 1 failed job for log inspection
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 3
+  concurrencyPolicy: Forbid
+  jobTemplate:
+    spec:
+      # Auto-delete completed jobs after 1 hour
+      ttlSecondsAfterFinished: 3600
+      backoffLimit: 1
+      template:
+        metadata:
+          labels:
+            app: db-health-check
+        spec:
+          restartPolicy: Never
+          containers:
+            - name: health-check
+              image: postgres:16-alpine
+              command: ["/bin/sh", "/scripts/db-health-check.sh"]
+              env:
+                - name: DB_HOST
+                  value: "postgres"
+                - name: DB_PORT
+                  value: "5432"
+                - name: DB_NAME
+                  value: "smarteventbar"
+                - name: DB_USER
+                  value: "smarteventbar"
+                - name: DB_PASSWORD
+                  valueFrom:
+                    secretKeyRef:
+                      name: postgres-secret
+                      key: POSTGRES_PASSWORD
+                # Thresholds (customize as needed)
+                - name: MAX_RESPONSE_TIME_MS
+                  value: "500"
+                - name: MAX_CONNECTIONS_PERCENT
+                  value: "80"
+                - name: MAX_DB_SIZE_GB
+                  value: "4"
+                - name: LONG_QUERY_SECONDS
+                  value: "30"
+                - name: MAX_DEAD_TUPLES
+                  value: "10000"
+              resources:
+                requests:
+                  cpu: 10m
+                  memory: 16Mi
+                limits:
+                  cpu: 50m
+                  memory: 32Mi
+              volumeMounts:
+                - name: scripts
+                  mountPath: /scripts
+          volumes:
+            - name: scripts
+              configMap:
+                name: db-health-check-script
+                defaultMode: 0755
+---
+# ConfigMap containing the health check script
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: db-health-check-script
+  namespace: drinksync
+  labels:
+    app.kubernetes.io/name: db-health-check
+    app.kubernetes.io/part-of: drinksync
+data:
+  db-health-check.sh: |
+    #!/bin/sh
+    # DrinkSync Database Health Check (Alpine sh-compatible)
+    set -u
+
+    DB_HOST="${DB_HOST:-postgres}"
+    DB_PORT="${DB_PORT:-5432}"
+    DB_NAME="${DB_NAME:-smarteventbar}"
+    DB_USER="${DB_USER:-smarteventbar}"
+
+    MAX_RESPONSE_TIME_MS="${MAX_RESPONSE_TIME_MS:-500}"
+    MAX_CONNECTIONS_PERCENT="${MAX_CONNECTIONS_PERCENT:-80}"
+    MAX_DB_SIZE_GB="${MAX_DB_SIZE_GB:-4}"
+    LONG_QUERY_SECONDS="${LONG_QUERY_SECONDS:-30}"
+    MAX_DEAD_TUPLES="${MAX_DEAD_TUPLES:-10000}"
+
+    export PGPASSWORD="$DB_PASSWORD"
+    PSQL="psql -h $DB_HOST -p $DB_PORT -U $DB_USER -d $DB_NAME -t -A"
+
+    OVERALL=0
+    warn() { echo "[WARNING] $1"; if [ "$OVERALL" -lt 1 ]; then OVERALL=1; fi; }
+    fail() { echo "[CRITICAL] $1"; OVERALL=2; }
+    ok()   { echo "[OK]      $1"; }
+    info() { echo "[INFO]    $1"; }
+
+    echo "============================================"
+    echo "  DrinkSync DB Health Check"
+    echo "  $(date '+%Y-%m-%d %H:%M:%S %Z')"
+    echo "  Target: $DB_HOST:$DB_PORT/$DB_NAME"
+    echo "============================================"
+
+    # 1. Connection test
+    START=$(date +%s)
+    if $PSQL -c "SELECT 1;" > /dev/null 2>&1; then
+      END=$(date +%s)
+      ELAPSED=$(( END - START ))
+      ok "Connection successful (${ELAPSED}s)"
+    else
+      fail "Cannot connect to database"
+      echo "OVERALL STATUS: CRITICAL"
+      exit 2
+    fi
+
+    # 2. Query response time
+    START_NS=$(date +%s%N 2>/dev/null || date +%s)
+    $PSQL -c "SELECT count(*) FROM orders;" > /dev/null 2>&1
+    END_NS=$(date +%s%N 2>/dev/null || date +%s)
+    if echo "$START_NS" | grep -q "N"; then
+      ok "Query response time: measured (nanosecond timer unavailable on Alpine)"
+    else
+      QUERY_MS=$(( (END_NS - START_NS) / 1000000 ))
+      if [ "$QUERY_MS" -lt "$MAX_RESPONSE_TIME_MS" ]; then
+        ok "Query response time: ${QUERY_MS}ms (< ${MAX_RESPONSE_TIME_MS}ms)"
+      else
+        warn "Slow query response: ${QUERY_MS}ms (threshold: ${MAX_RESPONSE_TIME_MS}ms)"
+      fi
+    fi
+
+    # 3. Active connections
+    ACTIVE=$($PSQL -c "SELECT count(*) FROM pg_stat_activity WHERE datname = '$DB_NAME';")
+    MAX_CONN=$($PSQL -c "SHOW max_connections;" | tr -d ' ')
+    if [ "$MAX_CONN" -gt 0 ] 2>/dev/null; then
+      PERCENT=$(( ACTIVE * 100 / MAX_CONN ))
+      if [ "$PERCENT" -lt "$MAX_CONNECTIONS_PERCENT" ]; then
+        ok "Active connections: $ACTIVE / $MAX_CONN (${PERCENT}%)"
+      else
+        warn "High connections: $ACTIVE / $MAX_CONN (${PERCENT}%)"
+      fi
+    fi
+
+    # 4. Database size
+    DB_SIZE_BYTES=$($PSQL -c "SELECT pg_database_size('$DB_NAME');")
+    DB_SIZE_MB=$(( DB_SIZE_BYTES / 1024 / 1024 ))
+    THRESHOLD_MB=$(( MAX_DB_SIZE_GB * 1024 ))
+    if [ "$DB_SIZE_MB" -lt "$THRESHOLD_MB" ]; then
+      ok "Database size: ${DB_SIZE_MB}MB (< ${MAX_DB_SIZE_GB}GB)"
+    else
+      warn "Large database: ${DB_SIZE_MB}MB (threshold: ${MAX_DB_SIZE_GB}GB)"
+    fi
+
+    # 5. Long-running queries
+    LONG=$($PSQL -c "SELECT count(*) FROM pg_stat_activity WHERE state='active' AND query NOT LIKE '%pg_stat_activity%' AND now()-query_start > interval '${LONG_QUERY_SECONDS} seconds';")
+    if [ "$LONG" -eq 0 ]; then
+      ok "No long-running queries (>${LONG_QUERY_SECONDS}s)"
+    else
+      warn "$LONG queries running > ${LONG_QUERY_SECONDS}s"
+    fi
+
+    # 6. Dead tuples
+    DEAD=$($PSQL -c "SELECT COALESCE(sum(n_dead_tup),0) FROM pg_stat_user_tables;")
+    if [ "$DEAD" -lt "$MAX_DEAD_TUPLES" ]; then
+      ok "Dead tuples: $DEAD (< $MAX_DEAD_TUPLES)"
+    else
+      warn "Dead tuples: $DEAD — VACUUM recommended"
+    fi
+
+    # 7. Table stats
+    ORDERS=$($PSQL -c "SELECT count(*) FROM orders;" 2>/dev/null || echo "?")
+    SESSIONS=$($PSQL -c "SELECT count(*) FROM session;" 2>/dev/null || echo "?")
+    NOTIFS=$($PSQL -c "SELECT count(*) FROM notification_log;" 2>/dev/null || echo "?")
+    info "Tables: orders=$ORDERS sessions=$SESSIONS notifications=$NOTIFS"
+
+    # 8. Disk space on PV (postgres data directory)
+    DISK_USAGE=$(df -h /var/lib/postgresql/data 2>/dev/null | tail -1 | awk '{print $5}' | tr -d '%')
+    if [ -n "$DISK_USAGE" ] 2>/dev/null; then
+      if [ "$DISK_USAGE" -lt 80 ]; then
+        ok "Disk usage: ${DISK_USAGE}%"
+      elif [ "$DISK_USAGE" -lt 90 ]; then
+        warn "Disk usage high: ${DISK_USAGE}%"
+      else
+        fail "Disk nearly full: ${DISK_USAGE}%"
+      fi
+    fi
+
+    echo ""
+    echo "============================================"
+    case $OVERALL in
+      0) echo "  OVERALL STATUS: HEALTHY" ;;
+      1) echo "  OVERALL STATUS: WARNING" ;;
+      2) echo "  OVERALL STATUS: CRITICAL" ;;
+    esac
+    echo "============================================"
+    exit $OVERALL
