@@ -65,6 +65,9 @@ class NotificationFlowIntegrationTest {
     private MixerItemRepository mixerItemRepository;
 
     @Autowired
+    private PremadeItemRepository premadeItemRepository;
+
+    @Autowired
     @Qualifier("notificationExecutor")
     private Executor notificationExecutor;
 
@@ -75,9 +78,10 @@ class NotificationFlowIntegrationTest {
 
     @BeforeEach
     void setUp() {
-        // Clean up from previous runs
+        // Clean up from previous runs — order matters for FK constraints
         notificationLogRepository.deleteAll();
         orderRepository.deleteAll();
+        premadeItemRepository.deleteAll();
         mixerItemRepository.deleteAll();
         spiritItemRepository.deleteAll();
         customerSessionRepository.deleteAll();
