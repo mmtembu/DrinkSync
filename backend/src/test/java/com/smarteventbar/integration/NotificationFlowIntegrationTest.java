@@ -11,16 +11,13 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.context.ActiveProfiles;
-import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.util.List;
 import java.util.UUID;
+import java.util.concurrent.Executor;
 
-import org.springframework.core.task.SyncTaskExecutor;
-import org.springframework.boot.test.context.TestConfiguration;
-import org.springframework.context.annotation.Bean;
-import org.springframework.context.annotation.Primary;
+import org.springframework.beans.factory.annotation.Qualifier;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -31,26 +28,14 @@ import static org.junit.jupiter.api.Assertions.*;
  * Uses the "test" profile which configures Testcontainers JDBC URL for PostgreSQL.
  * The MockWhatsAppClient is active (access-token="mock" in test config).
  * <p>
+ * Note: @Transactional is intentionally omitted because @Async methods run in a separate
+ * thread/transaction. Tests use manual cleanup or rely on Testcontainers isolation.
+ * <p>
  * Validates: Requirements 2.1, 2.3, 12.1
  */
 @SpringBootTest
 @ActiveProfiles("test")
-@Transactional
-@org.springframework.context.annotation.Import(NotificationFlowIntegrationTest.SyncExecutorConfig.class)
 class NotificationFlowIntegrationTest {
-
-    /**
-     * Override the async executor to be synchronous in tests so that
-     * notification processing completes within the same thread/transaction.
-     */
-    @TestConfiguration
-    static class SyncExecutorConfig {
-        @Bean("notificationExecutor")
-        @Primary
-        public java.util.concurrent.Executor notificationExecutor() {
-            return new SyncTaskExecutor();
-        }
-    }
 
     @Autowired
     private OrderService orderService;
@@ -79,6 +64,10 @@ class NotificationFlowIntegrationTest {
     @Autowired
     private MixerItemRepository mixerItemRepository;
 
+    @Autowired
+    @Qualifier("notificationExecutor")
+    private Executor notificationExecutor;
+
     private Station station;
     private CustomerSession session;
     private SpiritItem spirit;
@@ -86,6 +75,14 @@ class NotificationFlowIntegrationTest {
 
     @BeforeEach
     void setUp() {
+        // Clean up from previous runs
+        notificationLogRepository.deleteAll();
+        orderRepository.deleteAll();
+        mixerItemRepository.deleteAll();
+        spiritItemRepository.deleteAll();
+        customerSessionRepository.deleteAll();
+        stationRepository.deleteAll();
+
         station = stationRepository.save(
                 new Station("Notification Test Bar", "Stage Area", new BigDecimal("5.00"),
                         UUID.randomUUID().toString().substring(0, 6).toUpperCase(), 10));
@@ -99,17 +96,36 @@ class NotificationFlowIntegrationTest {
         session = sessionService.createSession(station.getId());
     }
 
+    /**
+     * Waits for the notification executor to complete all submitted tasks.
+     */
+    private void awaitNotificationCompletion() throws InterruptedException {
+        if (notificationExecutor instanceof org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor taskExecutor) {
+            long deadline = System.currentTimeMillis() + 10_000;
+            while (taskExecutor.getThreadPoolExecutor().getActiveCount() > 0
+                    || !taskExecutor.getThreadPoolExecutor().getQueue().isEmpty()) {
+                if (System.currentTimeMillis() > deadline) {
+                    throw new RuntimeException("Timed out waiting for notification executor");
+                }
+                Thread.sleep(50);
+            }
+            // Allow DB writes to flush
+            Thread.sleep(200);
+        }
+    }
+
     // -----------------------------------------------------------------------
     // Test: NotificationService creates log entry for opted-in order
     // -----------------------------------------------------------------------
 
     @Test
-    void notifyOrderConfirmed_createsNotificationLogEntry() {
+    void notifyOrderConfirmed_createsNotificationLogEntry() throws InterruptedException {
         // Create an order with WhatsApp opt-in
         CustomerOrder order = createOptedInOrder();
 
         // Directly invoke the notification service (simulating what happens after state transition)
         notificationService.notifyOrderConfirmed(order);
+        awaitNotificationCompletion();
 
         // Verify notification log entry was created
         List<NotificationLog> logs = notificationLogRepository.findAll();
@@ -130,12 +146,13 @@ class NotificationFlowIntegrationTest {
     }
 
     @Test
-    void notifyOrderReady_createsNotificationLogEntry() {
+    void notifyOrderReady_createsNotificationLogEntry() throws InterruptedException {
         CustomerOrder order = createOptedInOrder();
         order.setState(OrderState.READY);
         final CustomerOrder savedOrder = orderRepository.save(order);
 
         notificationService.notifyOrderReady(savedOrder);
+        awaitNotificationCompletion();
 
         NotificationLog logEntry = notificationLogRepository.findAll().stream()
                 .filter(l -> l.getOrder().getId().equals(savedOrder.getId()))
@@ -150,12 +167,13 @@ class NotificationFlowIntegrationTest {
     }
 
     @Test
-    void notifyOrderCollected_createsNotificationLogEntry() {
+    void notifyOrderCollected_createsNotificationLogEntry() throws InterruptedException {
         CustomerOrder order = createOptedInOrder();
         order.setState(OrderState.COLLECTED);
         final CustomerOrder savedOrder = orderRepository.save(order);
 
         notificationService.notifyOrderCollected(savedOrder);
+        awaitNotificationCompletion();
 
         NotificationLog logEntry = notificationLogRepository.findAll().stream()
                 .filter(l -> l.getOrder().getId().equals(savedOrder.getId()))
@@ -173,10 +191,11 @@ class NotificationFlowIntegrationTest {
     // -----------------------------------------------------------------------
 
     @Test
-    void notifyOrderConfirmed_skipsNonOptedInOrder() {
+    void notifyOrderConfirmed_skipsNonOptedInOrder() throws InterruptedException {
         CustomerOrder order = createNonOptedInOrder();
 
         notificationService.notifyOrderConfirmed(order);
+        awaitNotificationCompletion();
 
         List<NotificationLog> logs = notificationLogRepository.findAll().stream()
                 .filter(l -> l.getOrder().getId().equals(order.getId()))
@@ -190,11 +209,12 @@ class NotificationFlowIntegrationTest {
     // -----------------------------------------------------------------------
 
     @Test
-    void notifyOrderConfirmed_deduplicatesPreviouslySentNotification() {
+    void notifyOrderConfirmed_deduplicatesPreviouslySentNotification() throws InterruptedException {
         CustomerOrder order = createOptedInOrder();
 
         // First notification — should succeed
         notificationService.notifyOrderConfirmed(order);
+        awaitNotificationCompletion();
 
         long countAfterFirst = notificationLogRepository.findAll().stream()
                 .filter(l -> l.getOrder().getId().equals(order.getId()))
@@ -204,6 +224,7 @@ class NotificationFlowIntegrationTest {
 
         // Second notification — should be deduplicated (no new entry)
         notificationService.notifyOrderConfirmed(order);
+        awaitNotificationCompletion();
 
         long countAfterSecond = notificationLogRepository.findAll().stream()
                 .filter(l -> l.getOrder().getId().equals(order.getId()))
@@ -254,9 +275,10 @@ class NotificationFlowIntegrationTest {
     // -----------------------------------------------------------------------
 
     @Test
-    void processDeliveryStatus_updatesNotificationLogStatus() {
+    void processDeliveryStatus_updatesNotificationLogStatus() throws InterruptedException {
         CustomerOrder order = createOptedInOrder();
         notificationService.notifyOrderConfirmed(order);
+        awaitNotificationCompletion();
 
         // Find the log entry and get its provider message ID
         NotificationLog logEntry = notificationLogRepository.findAll().stream()
