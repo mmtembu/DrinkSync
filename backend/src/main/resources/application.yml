@@ -64,6 +64,17 @@ jwt:
   secret: smart-event-bar-jwt-secret-key-that-is-at-least-256-bits-long-for-hs256
   expiration-hours: 12
 
+# WhatsApp Cloud API configuration
+whatsapp:
+  phone-number-id: ${WHATSAPP_PHONE_NUMBER_ID:}
+  access-token: ${WHATSAPP_ACCESS_TOKEN:}
+  verify-token: ${WHATSAPP_VERIFY_TOKEN:}
+  business-account-id: ${WHATSAPP_BUSINESS_ACCOUNT_ID:}
+  app-secret: ${WHATSAPP_APP_SECRET:}
+  enabled: ${WHATSAPP_ENABLED:false}
+  send-timeout-seconds: 10
+  max-send-rate-per-second: 50
+
 # Logging configuration
 logging:
   level:

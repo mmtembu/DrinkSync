@@ -1,0 +1,297 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>DrinkSync — Mobile-First Event Bar Ordering</title>
+  <meta name="description" content="Eliminate queue chaos at event bars. Scan, order, pay, and get notified when your drink is ready.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<!-- Navigation -->
+<nav class="nav" id="nav">
+  <div class="container nav-inner">
+    <a href="#" class="nav-logo">DrinkSync</a>
+    <ul class="nav-links">
+      <li><a href="#features">Features</a></li>
+      <li><a href="#how-it-works">How It Works</a></li>
+      <li><a href="#use-cases">Use Cases</a></li>
+      <li><a href="#tech">Tech Stack</a></li>
+    </ul>
+    <a href="https://github.com/mmtembu/DrinkSync" class="btn btn-outline nav-cta" target="_blank">View on GitHub</a>
+    <button class="mobile-toggle" aria-label="Menu">☰</button>
+  </div>
+</nav>
+
+<!-- Hero -->
+<section class="hero">
+  <div class="container">
+    <div class="hero-content">
+      <div class="hero-badge"><span></span> Open Source Project</div>
+      <h1>Kill the queue.<br><span class="gradient">Serve faster.</span></h1>
+      <p>DrinkSync is a mobile-first ordering platform for event bars. Customers scan a QR code, build their drink, pay, and get real-time updates — no app install needed.</p>
+      <div class="hero-buttons">
+        <a href="https://github.com/mmtembu/DrinkSync" class="btn btn-primary" target="_blank">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"/></svg>
+          GitHub
+        </a>
+        <a href="#how-it-works" class="btn btn-outline">See How It Works</a>
+      </div>
+      <div class="hero-stats">
+        <div class="hero-stat"><h3>&lt;1s</h3><p>Real-time updates</p></div>
+        <div class="hero-stat"><h3>0</h3><p>App installs needed</p></div>
+        <div class="hero-stat"><h3>100%</h3><p>Digital order flow</p></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- Features -->
+<section class="section" id="features">
+  <div class="container">
+    <div class="text-center">
+      <p class="section-label">Features</p>
+      <h2 class="section-title">Everything you need to run a modern event bar</h2>
+      <p class="section-subtitle mx-auto">From QR code entry to pickup notification — every step is digital, fast, and frictionless.</p>
+    </div>
+    <div class="features-grid">
+      <div class="feature-card fade-in">
+        <div class="feature-icon">📱</div>
+        <h3>QR Code Entry</h3>
+        <p>Customers scan a station-specific QR code and instantly access the menu. No app download, no sign-up friction.</p>
+      </div>
+      <div class="feature-card fade-in">
+        <div class="feature-icon">🍸</div>
+        <h3>Custom Drink Builder</h3>
+        <p>Spirit + Mixer + Cup Option. Customers build exactly what they want with a visual, tap-friendly interface.</p>
+      </div>
+      <div class="feature-card fade-in">
+        <div class="feature-icon">⚡</div>
+        <h3>Real-Time Queue</h3>
+        <p>Live order status via WebSocket. Customers know exactly where they are in the queue — no guessing, no hovering.</p>
+      </div>
+      <div class="feature-card fade-in">
+        <div class="feature-icon">📊</div>
+        <h3>Vendor Dashboard</h3>
+        <p>Tablet-friendly interface for managing incoming orders. One-tap state transitions, availability toggles, and queue visibility.</p>
+      </div>
+      <div class="feature-card fade-in">
+        <div class="feature-icon">💬</div>
+        <h3>WhatsApp Notifications</h3>
+        <p>Optional order updates via WhatsApp. Customers get notified when their drink is confirmed, ready, and collected.</p>
+      </div>
+      <div class="feature-card fade-in">
+        <div class="feature-icon">🔒</div>
+        <h3>Idempotent Payments</h3>
+        <p>Duplicate-safe payment processing with idempotency keys. Network retries and double-taps are handled gracefully.</p>
+      </div>
+      <div class="feature-card fade-in">
+        <div class="feature-icon">📡</div>
+        <h3>Offline Support</h3>
+        <p>PWA with service worker for graceful offline handling. The app recovers automatically when connectivity returns.</p>
+      </div>
+      <div class="feature-card fade-in">
+        <div class="feature-icon">🌙</div>
+        <h3>Dark/Light Theme</h3>
+        <p>Automatic theme detection with manual toggle. Readable in bright outdoor festivals and dark indoor venues.</p>
+      </div>
+      <div class="feature-card fade-in">
+        <div class="feature-icon">📈</div>
+        <h3>Full Observability</h3>
+        <p>OpenTelemetry traces, logs, and metrics piped to Elasticsearch + Kibana for real-time operational insight.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- How It Works -->
+<section class="section" id="how-it-works" style="background:var(--surface)">
+  <div class="container">
+    <div class="text-center">
+      <p class="section-label">How It Works</p>
+      <h2 class="section-title">From scan to sip in minutes</h2>
+      <p class="section-subtitle mx-auto">The entire order lifecycle is digital, transparent, and fast.</p>
+    </div>
+    <div class="steps">
+      <div class="step fade-in">
+        <h3>Scan QR Code</h3>
+        <p>Customer scans the station QR code with their phone camera. The menu opens instantly in the browser.</p>
+      </div>
+      <div class="step fade-in">
+        <h3>Build Your Order</h3>
+        <p>Choose a custom drink (spirit + mixer + cup) or grab a pre-made item. Add to cart.</p>
+      </div>
+      <div class="step fade-in">
+        <h3>Pay & Join Queue</h3>
+        <p>Complete payment and receive a queue position. Your order enters the preparation queue immediately.</p>
+      </div>
+      <div class="step fade-in">
+        <h3>Track in Real-Time</h3>
+        <p>Watch your order move through PREPARING → READY via live WebSocket updates or WhatsApp notifications.</p>
+      </div>
+      <div class="step fade-in">
+        <h3>Collect Your Drink</h3>
+        <p>When notified, head to the pickup point. Show your order number and collect within the pickup window.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- Use Cases -->
+<section class="section" id="use-cases">
+  <div class="container">
+    <div class="text-center">
+      <p class="section-label">Use Cases</p>
+      <h2 class="section-title">Built for high-volume events</h2>
+      <p class="section-subtitle mx-auto">DrinkSync shines wherever queues form and speed matters.</p>
+    </div>
+    <div class="use-cases">
+      <div class="use-case fade-in">
+        <div class="use-case-icon">🎵</div>
+        <h3>Music Festivals</h3>
+        <p>Multi-day events with thousands of attendees and multiple bar stations spread across the venue.</p>
+        <ul>
+          <li>Reduce queue times by 60%+</li>
+          <li>Capture walk-away revenue</li>
+          <li>Per-station menu customisation</li>
+          <li>Real-time demand visibility</li>
+        </ul>
+      </div>
+      <div class="use-case fade-in">
+        <div class="use-case-icon">🏟️</div>
+        <h3>Sporting Events</h3>
+        <p>Half-time rushes create extreme peak demand. Pre-ordering during play eliminates the crush.</p>
+        <ul>
+          <li>Pre-order during the match</li>
+          <li>Pickup at half-time — no queue</li>
+          <li>Handle 10x demand spikes</li>
+          <li>Faster service = more sales</li>
+        </ul>
+      </div>
+      <div class="use-case fade-in">
+        <div class="use-case-icon">🎪</div>
+        <h3>Corporate Events & Parties</h3>
+        <p>Premium experiences where guests expect seamless service without standing in line.</p>
+        <ul>
+          <li>White-glove digital experience</li>
+          <li>Custom menus per event</li>
+          <li>WhatsApp pickup notifications</li>
+          <li>No cash handling needed</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- Order Lifecycle -->
+<section class="section" style="background:var(--surface)">
+  <div class="container">
+    <div class="text-center">
+      <p class="section-label">Order Lifecycle</p>
+      <h2 class="section-title">Strict state management you can trust</h2>
+      <p class="section-subtitle mx-auto">Every state transition is persisted, timestamped, and pushed in real-time.</p>
+    </div>
+    <div class="arch-diagram fade-in">DRAFT → AWAITING_PAYMENT → PAID → PREPARING → READY → COLLECTED
+  │                          │
+  └──── CANCELLED ◀──────────┘
+                                                         EXPIRED (pickup window exceeded)
+
+• Orders remain in DRAFT until checkout
+• Payment confirmation assigns a queue position
+• Only paid orders enter the preparation queue
+• All transitions pushed via WebSocket within 1 second
+• Full audit trail in order_state_history table</div>
+  </div>
+</section>
+
+<!-- Tech Stack -->
+<section class="section" id="tech">
+  <div class="container">
+    <div class="text-center">
+      <p class="section-label">Technology</p>
+      <h2 class="section-title">Modern stack, production-ready</h2>
+      <p class="section-subtitle mx-auto">Built with proven technologies chosen for reliability, performance, and developer experience.</p>
+    </div>
+    <div class="tech-grid">
+      <div class="tech-item fade-in"><span>☕</span><p>Java 17</p></div>
+      <div class="tech-item fade-in"><span>🍃</span><p>Spring Boot 3.4</p></div>
+      <div class="tech-item fade-in"><span>🐘</span><p>PostgreSQL 16</p></div>
+      <div class="tech-item fade-in"><span>⚛️</span><p>React 19</p></div>
+      <div class="tech-item fade-in"><span>📘</span><p>TypeScript</p></div>
+      <div class="tech-item fade-in"><span>⚡</span><p>Vite</p></div>
+      <div class="tech-item fade-in"><span>🔌</span><p>WebSocket/STOMP</p></div>
+      <div class="tech-item fade-in"><span>🔑</span><p>JWT Auth</p></div>
+      <div class="tech-item fade-in"><span>🐳</span><p>Docker Compose</p></div>
+      <div class="tech-item fade-in"><span>📡</span><p>OpenTelemetry</p></div>
+      <div class="tech-item fade-in"><span>🔍</span><p>Elasticsearch</p></div>
+      <div class="tech-item fade-in"><span>💬</span><p>WhatsApp API</p></div>
+    </div>
+  </div>
+</section>
+
+<!-- Architecture -->
+<section class="section" style="background:var(--surface)">
+  <div class="container">
+    <div class="text-center">
+      <p class="section-label">Architecture</p>
+      <h2 class="section-title">Clean, observable, containerised</h2>
+    </div>
+    <div class="arch-diagram fade-in">┌─────────────┐     ┌──────────────────┐     ┌────────────┐
+│  React PWA  │────▶│  Spring Boot API │────▶│ PostgreSQL │
+│  (Vite)     │◀────│  + WebSocket     │     │            │
+└─────────────┘     └──────────────────┘     └────────────┘
+                           │
+                    ┌──────┴──────┐
+                    │ OTel Agent  │
+                    └──────┬──────┘
+                           │
+                    ┌──────▼──────┐     ┌─────────┐
+                    │  OTel       │────▶│ Elastic │
+                    │  Collector  │     │ + Kibana│
+                    └─────────────┘     └─────────┘</div>
+  </div>
+</section>
+
+<!-- CTA -->
+<section class="cta-section">
+  <div class="container" style="position:relative;z-index:1">
+    <h2>Ready to eliminate queue chaos?</h2>
+    <p>DrinkSync is open source. Clone it, run it, deploy it at your next event.</p>
+    <div class="hero-buttons" style="justify-content:center">
+      <a href="https://github.com/mmtembu/DrinkSync" class="btn btn-primary" target="_blank">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"/></svg>
+        Get Started on GitHub
+      </a>
+    </div>
+  </div>
+</section>
+
+<!-- Footer -->
+<footer class="footer">
+  <div class="container">
+    <ul class="footer-links">
+      <li><a href="https://github.com/mmtembu/DrinkSync" target="_blank">GitHub</a></li>
+      <li><a href="https://github.com/mmtembu/DrinkSync/blob/main/README.md" target="_blank">Documentation</a></li>
+      <li><a href="DrinkSync_White_Paper.md">White Paper</a></li>
+    </ul>
+    <p>© 2026 DrinkSync. Built by Mangaliso Mtembu.</p>
+  </div>
+</footer>
+
+<script>
+// Navbar scroll effect
+const nav=document.getElementById('nav');
+window.addEventListener('scroll',()=>{nav.classList.toggle('scrolled',window.scrollY>50)});
+
+// Fade-in on scroll
+const observer=new IntersectionObserver(entries=>{
+  entries.forEach(e=>{if(e.isIntersecting){e.target.classList.add('visible');observer.unobserve(e.target)}})
+},{threshold:0.1});
+document.querySelectorAll('.fade-in').forEach(el=>observer.observe(el));
+</script>
+</body>
+</html>

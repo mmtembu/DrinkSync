@@ -2,11 +2,16 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { useSession } from '../../hooks/useSession';
 import { Skeleton } from '../../components/Skeleton';
 import { BackButton } from '../../components/BackButton';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { orderApi } from '../../services/orderApi';
 import { generateIdempotencyKey } from '../../services/idempotencyKeyGenerator';
+import { WhatsAppOptIn } from '../../components/WhatsAppOptIn';
+import type { WhatsAppOptInData } from '../../components/WhatsAppOptIn';
 import type { Order } from '../../types/order';
 import { OrderState } from '../../types/order';
+
+const WHATSAPP_PHONE_KEY = 'drinksync-whatsapp-phone';
+const WHATSAPP_OPTIN_KEY = 'drinksync-whatsapp-optin';
 
 export function CheckoutPage() {
   const { stationId, orderId } = useParams<{ stationId: string; orderId: string }>();
@@ -19,6 +24,23 @@ export function CheckoutPage() {
   const [loading, setLoading] = useState(false);
   const [paymentLoading, setPaymentLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // WhatsApp opt-in state
+  const [whatsAppData, setWhatsAppData] = useState<WhatsAppOptInData>({
+    customerPhone: '',
+    whatsappOptIn: false,
+  });
+  const [whatsAppError, setWhatsAppError] = useState<string | null>(null);
+
+  // Load saved WhatsApp preferences from sessionStorage
+  const savedPhone = sessionStorage.getItem(WHATSAPP_PHONE_KEY) || '';
+  const savedOptIn = sessionStorage.getItem(WHATSAPP_OPTIN_KEY) === 'true';
+
+  const handleWhatsAppChange = useCallback((data: WhatsAppOptInData) => {
+    setWhatsAppData(data);
+    // Clear backend validation error when user changes input
+    if (whatsAppError) setWhatsAppError(null);
+  }, [whatsAppError]);
 
   useEffect(() => {
     if (sessionId && oId) {
@@ -39,8 +61,16 @@ export function CheckoutPage() {
     if (!sessionId || !order) return;
     setLoading(true);
     setError(null);
+    setWhatsAppError(null);
     try {
-      const updated = await orderApi.checkout(order.id, sessionId);
+      // Build checkout body with WhatsApp opt-in data
+      const checkoutBody: { customerPhone?: string; whatsappOptIn?: boolean } = {};
+      if (whatsAppData.customerPhone) {
+        checkoutBody.customerPhone = whatsAppData.customerPhone;
+      }
+      checkoutBody.whatsappOptIn = whatsAppData.whatsappOptIn;
+
+      const updated = await orderApi.checkout(order.id, sessionId, checkoutBody);
       setOrder(updated);
     } catch (e: unknown) {
       const err = e as { body?: { message?: string }; message?: string };
@@ -128,6 +158,12 @@ export function CheckoutPage() {
 
           {order.state === OrderState.DRAFT && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+              <WhatsAppOptIn
+                initialPhone={savedPhone}
+                initialOptIn={savedOptIn}
+                onChange={handleWhatsAppChange}
+                error={whatsAppError}
+              />
               <button onClick={handleCheckout} disabled={loading} className="btn btn-primary btn-full btn-lg">
                 {loading ? 'Processing...' : 'Proceed to Payment'}
               </button>

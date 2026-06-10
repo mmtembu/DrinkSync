@@ -36,6 +36,12 @@ public class CustomerSession {
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;
 
+    @Column(name = "customer_phone", length = 20)
+    private String customerPhone;
+
+    @Column(name = "whatsapp_opt_in", nullable = false)
+    private boolean whatsappOptIn = false;
+
     public CustomerSession() {
     }
 
@@ -93,5 +99,21 @@ public class CustomerSession {
 
     public void setCreatedAt(LocalDateTime createdAt) {
         this.createdAt = createdAt;
+    }
+
+    public String getCustomerPhone() {
+        return customerPhone;
+    }
+
+    public void setCustomerPhone(String customerPhone) {
+        this.customerPhone = customerPhone;
+    }
+
+    public boolean isWhatsappOptIn() {
+        return whatsappOptIn;
+    }
+
+    public void setWhatsappOptIn(boolean whatsappOptIn) {
+        this.whatsappOptIn = whatsappOptIn;
     }
 }
