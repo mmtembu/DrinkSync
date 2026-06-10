@@ -29,7 +29,10 @@ export function OrderTrackingPage() {
     finally { setLoading(false); }
   }, [sessionId]);
 
-  useEffect(() => { fetchOrders(); }, [fetchOrders]);
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    fetchOrders();
+  }, [fetchOrders]);
 
   // Poll for updates every 5 seconds as a fallback
   useEffect(() => {

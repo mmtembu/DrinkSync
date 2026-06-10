@@ -12,6 +12,7 @@ export const test = base.extend<{
   api: TestApi;
   stationId: number;
 }>({
+  /* eslint-disable react-hooks/rules-of-hooks, no-empty-pattern */
   api: async ({ request }, use) => {
     await use(new TestApi(request));
   },
@@ -19,6 +20,7 @@ export const test = base.extend<{
     // Default test station — assumes dev seed data has station with ID 1
     await use(1);
   },
+  /* eslint-enable react-hooks/rules-of-hooks, no-empty-pattern */
 });
 
 export { expect };

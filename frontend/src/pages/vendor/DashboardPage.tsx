@@ -25,10 +25,14 @@ export function DashboardPage() {
     finally { setLoading(false); }
   }, [token, stationId]);
 
-  useEffect(() => { fetchOrders(); }, [fetchOrders]);
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    fetchOrders();
+  }, [fetchOrders]);
 
   // Refresh when WebSocket update arrives
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     if (latestUpdate) fetchOrders();
   }, [latestUpdate, fetchOrders]);
 

@@ -22,8 +22,16 @@ export function CheckoutPage() {
 
   useEffect(() => {
     if (sessionId && oId) {
-      setLoading(true);
-      orderApi.getOrder(oId, sessionId).then(setOrder).catch((e) => setError(e.message)).finally(() => setLoading(false));
+      let cancelled = false;
+      orderApi.getOrder(oId, sessionId).then((data) => {
+        if (!cancelled) setOrder(data);
+      }).catch((e: unknown) => {
+        if (!cancelled) {
+          const err = e as { message?: string };
+          setError(err.message ?? 'Failed to load order');
+        }
+      });
+      return () => { cancelled = true; };
     }
   }, [oId, sessionId]);
 
@@ -34,8 +42,9 @@ export function CheckoutPage() {
     try {
       const updated = await orderApi.checkout(order.id, sessionId);
       setOrder(updated);
-    } catch (e: any) {
-      setError(e.body?.message || e.message);
+    } catch (e: unknown) {
+      const err = e as { body?: { message?: string }; message?: string };
+      setError(err.body?.message || err.message || 'Checkout failed');
     } finally {
       setLoading(false);
     }
@@ -50,8 +59,9 @@ export function CheckoutPage() {
       const updated = await orderApi.pay(order.id, key, sessionId);
       setOrder(updated);
       navigate(`/station/${stId}/tracking`);
-    } catch (e: any) {
-      setError(e.body?.message || e.message || 'Payment failed. Please try again.');
+    } catch (e: unknown) {
+      const err = e as { body?: { message?: string }; message?: string };
+      setError(err.body?.message || err.message || 'Payment failed. Please try again.');
     } finally {
       setPaymentLoading(false);
     }
@@ -62,8 +72,9 @@ export function CheckoutPage() {
     try {
       await orderApi.cancel(order.id, sessionId);
       navigate(`/station/${stId}`);
-    } catch (e: any) {
-      setError(e.body?.message || e.message);
+    } catch (e: unknown) {
+      const err = e as { body?: { message?: string }; message?: string };
+      setError(err.body?.message || err.message || 'Cancel failed');
     }
   };
 

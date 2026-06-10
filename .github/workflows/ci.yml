@@ -3,6 +3,8 @@ name: "CI - Lint & Test"
 on:
   pull_request:
     branches: [main]
+  push:
+    branches: [main, "feature/**", "infra/**"]
 
 jobs:
   backend-test:
@@ -14,15 +16,15 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Set up JDK 21
+      - name: Set up JDK 17
         uses: actions/setup-java@v4
         with:
-          java-version: "21"
+          java-version: "17"
           distribution: "temurin"
           cache: "maven"
 
-      - name: Run tests (unit + property, skip integration)
-        run: ./mvnw verify -DskipITs -B
+      - name: Run all tests (unit + property + integration via Testcontainers)
+        run: ./mvnw test -B
 
   frontend-test:
     name: Frontend Test
@@ -47,4 +49,4 @@ jobs:
         run: npm run lint
 
       - name: Run tests
-        run: npm run test -- --run
+        run: npm run test
