@@ -188,6 +188,10 @@ class WebSocketDeliveryIntegrationTest {
 
     @Test
     void perStationSubscription_receivesStateChangeWithin1Second() throws Exception {
+        // Create and pay an order BEFORE subscribing to avoid draining
+        // the PAID broadcast which can arrive with variable timing
+        CustomerOrder order = createAndPayOrder();
+
         // Connect and subscribe to station topic
         StompSession stompSession = connectAndTrack();
         BlockingQueue<OrderResponse> messages = new LinkedBlockingQueue<>();
@@ -198,12 +202,6 @@ class WebSocketDeliveryIntegrationTest {
 
         // Allow subscription to register
         Thread.sleep(500);
-
-        // Create and pay an order, then transition to PREPARING
-        CustomerOrder order = createAndPayOrder();
-
-        // Clear any messages from payment (PAID broadcast)
-        messages.clear();
 
         // Trigger a state transition — this should broadcast to the station topic
         orderService.transitionState(order.getId(), OrderState.PREPARING);
