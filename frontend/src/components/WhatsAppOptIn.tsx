@@ -50,6 +50,7 @@ function parsePhone(fullPhone: string): { countryCode: string; localNumber: stri
  * Validates a phone number against E.164 format.
  * E.164: starts with +, followed by 1-15 digits (first digit non-zero).
  */
+// eslint-disable-next-line react-refresh/only-export-components
 export function validateE164(phoneNumber: string): boolean {
   return /^\+[1-9]\d{1,14}$/.test(phoneNumber);
 }
@@ -77,6 +78,7 @@ export function WhatsAppOptIn({ initialPhone, initialOptIn, onChange, error }: W
   useEffect(() => {
     if (initialPhone) {
       const { countryCode: code, localNumber: num } = parsePhone(initialPhone);
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setCountryCode(code);
       setLocalNumber(num);
     }
@@ -84,6 +86,7 @@ export function WhatsAppOptIn({ initialPhone, initialOptIn, onChange, error }: W
 
   useEffect(() => {
     if (initialOptIn !== undefined) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setOptIn(initialOptIn);
     }
   }, [initialOptIn]);

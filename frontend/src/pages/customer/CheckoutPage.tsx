@@ -72,9 +72,22 @@ export function CheckoutPage() {
 
       const updated = await orderApi.checkout(order.id, sessionId, checkoutBody);
       setOrder(updated);
+
+      // Persist WhatsApp preferences to sessionStorage for subsequent orders
+      if (whatsAppData.customerPhone) {
+        sessionStorage.setItem(WHATSAPP_PHONE_KEY, whatsAppData.customerPhone);
+      }
+      sessionStorage.setItem(WHATSAPP_OPTIN_KEY, String(whatsAppData.whatsappOptIn));
     } catch (e: unknown) {
-      const err = e as { body?: { message?: string }; message?: string };
-      setError(err.body?.message || err.message || 'Checkout failed');
+      const err = e as { status?: number; body?: { message?: string }; message?: string };
+      const status = err.status;
+      const message = err.body?.message || err.message || 'Checkout failed';
+      // Handle 400 validation errors (e.g. invalid phone format) from backend
+      if (status === 400 && message && message.toLowerCase().includes('phone')) {
+        setWhatsAppError(message);
+      } else {
+        setError(message);
+      }
     } finally {
       setLoading(false);
     }
