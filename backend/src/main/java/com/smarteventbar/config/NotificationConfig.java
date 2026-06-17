@@ -2,6 +2,7 @@ package com.smarteventbar.config;
 
 import io.micrometer.core.instrument.Gauge;
 import io.micrometer.core.instrument.MeterRegistry;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -23,8 +24,12 @@ public class NotificationConfig {
      * Async thread pool for notification dispatch.
      * Core pool: 2 threads, Max pool: 5 threads, Queue capacity: 100.
      * Notifications are dispatched on this executor to avoid blocking order state transitions.
+     *
+     * ConditionalOnMissingBean allows test configurations to provide a synchronous
+     * replacement (e.g., SyncTaskExecutor) that wins over this production bean.
      */
     @Bean("notificationExecutor")
+    @ConditionalOnMissingBean(name = "notificationExecutor")
     public Executor notificationExecutor() {
         ThreadPoolTaskExecutor executor = new ThreadPoolTaskExecutor();
         executor.setCorePoolSize(2);
