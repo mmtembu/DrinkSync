@@ -5,7 +5,7 @@ import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { CheckoutPage } from './CheckoutPage';
 import { orderApi } from '../../services/orderApi';
 import type { Order } from '../../types/order';
-import { OrderState } from '../../types/order';
+import { OrderState, OrderItemType } from '../../types/order';
 
 vi.mock('../../services/orderApi', () => ({
   orderApi: {
@@ -27,21 +27,20 @@ vi.mock('../../services/idempotencyKeyGenerator', () => ({
 const mockOrder: Order = {
   id: 1,
   stationId: 1,
-  sessionId: 'test-session-id',
+  stationName: 'Test Station',
   state: OrderState.DRAFT,
   items: [
     {
       id: 1,
+      itemType: OrderItemType.CUSTOM_DRINK,
       quantity: 2,
       unitPrice: 50,
       spiritItems: [{ name: 'Vodka', id: 1 }],
       mixerItems: [{ name: 'Tonic', id: 2 }],
-      premadeItemName: null,
     },
   ],
   totalPrice: 100,
   visualOrderNumber: 'A01',
-  queuePosition: null,
   createdAt: '2024-01-01T00:00:00',
   updatedAt: '2024-01-01T00:00:00',
 };
