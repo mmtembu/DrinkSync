@@ -39,7 +39,7 @@ jobs:
         run: |
           npm ci
           npm run lint
-          npm run test -- --run
+          npm run test:ci
 
   build-and-push:
     name: Build & Push Images

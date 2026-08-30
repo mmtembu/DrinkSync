@@ -26,6 +26,9 @@ import org.springframework.web.socket.sockjs.client.SockJsClient;
 import org.springframework.web.socket.sockjs.client.Transport;
 import org.springframework.web.socket.sockjs.client.WebSocketTransport;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import java.lang.reflect.Type;
 import java.math.BigDecimal;
 import java.util.ArrayList;
@@ -49,6 +52,13 @@ import static org.junit.jupiter.api.Assertions.*;
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 @ActiveProfiles("test")
 class WebSocketDeliveryIntegrationTest {
+
+    // --- Timeout constants ---
+    private static final long CONNECTION_TIMEOUT_SECONDS = 5;
+    private static final long DELIVERY_SLA_SECONDS = 1;
+    private static final long NO_MESSAGE_WAIT_MS = 200;
+    private static final long SUBSCRIPTION_PROPAGATION_MS = 200;
+    private static final long ISOLATION_WAIT_MS = 500;
 
     @LocalServerPort
     private int port;
@@ -128,7 +138,13 @@ class WebSocketDeliveryIntegrationTest {
             stompClient.stop();
         }
 
-        // Clean up test data
+        // Note: @Transactional rollback is not viable with RANDOM_PORT because
+        // the server runs in a separate thread with its own transaction boundaries.
+        // We use explicit cleanup in FK-dependency order instead.
+        cleanUpTestData();
+    }
+
+    private void cleanUpTestData() {
         Long stationId = station.getId();
         jdbcTemplate.update(
                 "DELETE FROM idempotency_key WHERE order_id IN (SELECT id FROM orders WHERE station_id = ?)",
@@ -148,12 +164,40 @@ class WebSocketDeliveryIntegrationTest {
         return "ws://localhost:" + port + "/ws";
     }
 
+    private String stationTopic(Long stationId) {
+        return "/topic/stations/" + stationId + "/orders";
+    }
+
+    private String orderTopic(Long orderId) {
+        return "/topic/orders/" + orderId;
+    }
+
     private StompSession connectAndTrack() throws Exception {
         StompSession stompSession = stompClient
                 .connectAsync(wsUrl(), new NoOpStompSessionHandler())
-                .get(5, TimeUnit.SECONDS);
+                .get(CONNECTION_TIMEOUT_SECONDS, TimeUnit.SECONDS);
         activeSessions.add(stompSession);
         return stompSession;
+    }
+
+    /**
+     * Subscribes to the given topic and returns a BlockingQueue that will receive messages.
+     * Uses a short deterministic wait for subscription propagation since SimpleBroker
+     * (in-memory) does not support STOMP receipts.
+     */
+    private BlockingQueue<OrderResponse> subscribeWithConfirmation(StompSession stompSession, String topic)
+            throws InterruptedException {
+        BlockingQueue<OrderResponse> messages = new LinkedBlockingQueue<>();
+
+        StompHeaders headers = new StompHeaders();
+        headers.setDestination(topic);
+
+        stompSession.subscribe(headers, new OrderResponseFrameHandler(messages));
+
+        // SimpleBroker (in-memory) does not support STOMP receipts, so we use
+        // a short deterministic wait for subscription propagation instead
+        Thread.sleep(SUBSCRIPTION_PROPAGATION_MS);
+        return messages;
     }
 
     private OrderItemRequest premadeRequest() {
@@ -188,32 +232,28 @@ class WebSocketDeliveryIntegrationTest {
 
     @Test
     void perStationSubscription_receivesStateChangeWithin1Second() throws Exception {
-        // Connect and subscribe to station topic
-        StompSession stompSession = connectAndTrack();
-        BlockingQueue<OrderResponse> messages = new LinkedBlockingQueue<>();
-
-        stompSession.subscribe(
-                "/topic/stations/" + station.getId() + "/orders",
-                new OrderResponseFrameHandler(messages));
-
-        // Allow subscription to register
-        Thread.sleep(500);
-
-        // Create and pay an order, then transition to PREPARING
+        // Create and pay an order BEFORE subscribing to avoid draining
+        // the PAID broadcast which can arrive with variable timing
         CustomerOrder order = createAndPayOrder();
 
-        // Clear any messages from payment (PAID broadcast)
-        messages.clear();
+        // Connect and subscribe to station topic
+        StompSession stompSession = connectAndTrack();
+        BlockingQueue<OrderResponse> messages = subscribeWithConfirmation(
+                stompSession, stationTopic(station.getId()));
 
         // Trigger a state transition — this should broadcast to the station topic
         orderService.transitionState(order.getId(), OrderState.PREPARING);
 
         // Verify message received within 1 second
-        OrderResponse received = messages.poll(1, TimeUnit.SECONDS);
+        OrderResponse received = messages.poll(DELIVERY_SLA_SECONDS, TimeUnit.SECONDS);
         assertNotNull(received, "Should receive state change on station topic within 1 second");
         assertEquals(order.getId(), received.getId());
         assertEquals(OrderState.PREPARING, received.getState());
         assertEquals(station.getId(), received.getStationId());
+
+        // Confirm no unexpected additional messages
+        assertNull(messages.poll(NO_MESSAGE_WAIT_MS, TimeUnit.MILLISECONDS),
+                "Should not receive unexpected additional messages on station topic");
     }
 
     // -----------------------------------------------------------------------
@@ -228,23 +268,21 @@ class WebSocketDeliveryIntegrationTest {
 
         // Connect and subscribe to order-specific topic
         StompSession stompSession = connectAndTrack();
-        BlockingQueue<OrderResponse> messages = new LinkedBlockingQueue<>();
-
-        stompSession.subscribe(
-                "/topic/orders/" + order.getId(),
-                new OrderResponseFrameHandler(messages));
-
-        // Allow subscription to register
-        Thread.sleep(500);
+        BlockingQueue<OrderResponse> messages = subscribeWithConfirmation(
+                stompSession, orderTopic(order.getId()));
 
         // Trigger a state transition
         orderService.transitionState(order.getId(), OrderState.PREPARING);
 
         // Verify message received within 1 second
-        OrderResponse received = messages.poll(1, TimeUnit.SECONDS);
+        OrderResponse received = messages.poll(DELIVERY_SLA_SECONDS, TimeUnit.SECONDS);
         assertNotNull(received, "Should receive state change on order topic within 1 second");
         assertEquals(order.getId(), received.getId());
         assertEquals(OrderState.PREPARING, received.getState());
+
+        // Confirm no unexpected additional messages
+        assertNull(messages.poll(NO_MESSAGE_WAIT_MS, TimeUnit.MILLISECONDS),
+                "Should not receive unexpected additional messages on order topic");
     }
 
     // -----------------------------------------------------------------------
@@ -260,35 +298,33 @@ class WebSocketDeliveryIntegrationTest {
 
         // Connect and subscribe to station topic
         StompSession stompSession = connectAndTrack();
-        BlockingQueue<OrderResponse> messages = new LinkedBlockingQueue<>();
-
-        stompSession.subscribe(
-                "/topic/stations/" + station.getId() + "/orders",
-                new OrderResponseFrameHandler(messages));
-
-        // Allow subscription to register
-        Thread.sleep(500);
+        BlockingQueue<OrderResponse> messages = subscribeWithConfirmation(
+                stompSession, stationTopic(station.getId()));
 
         // Transition PAID → PREPARING
         orderService.transitionState(order.getId(), OrderState.PREPARING);
-        OrderResponse preparingMsg = messages.poll(1, TimeUnit.SECONDS);
+        OrderResponse preparingMsg = messages.poll(DELIVERY_SLA_SECONDS, TimeUnit.SECONDS);
         assertNotNull(preparingMsg, "Should receive PREPARING state on station topic within 1 second");
         assertEquals(OrderState.PREPARING, preparingMsg.getState());
         assertEquals(order.getId(), preparingMsg.getId());
 
         // Transition PREPARING → READY
         orderService.transitionState(order.getId(), OrderState.READY);
-        OrderResponse readyMsg = messages.poll(1, TimeUnit.SECONDS);
+        OrderResponse readyMsg = messages.poll(DELIVERY_SLA_SECONDS, TimeUnit.SECONDS);
         assertNotNull(readyMsg, "Should receive READY state on station topic within 1 second");
         assertEquals(OrderState.READY, readyMsg.getState());
         assertEquals(order.getId(), readyMsg.getId());
 
         // Transition READY → COLLECTED
         orderService.transitionState(order.getId(), OrderState.COLLECTED);
-        OrderResponse collectedMsg = messages.poll(1, TimeUnit.SECONDS);
+        OrderResponse collectedMsg = messages.poll(DELIVERY_SLA_SECONDS, TimeUnit.SECONDS);
         assertNotNull(collectedMsg, "Should receive COLLECTED state on station topic within 1 second");
         assertEquals(OrderState.COLLECTED, collectedMsg.getState());
         assertEquals(order.getId(), collectedMsg.getId());
+
+        // Confirm no unexpected additional messages
+        assertNull(messages.poll(NO_MESSAGE_WAIT_MS, TimeUnit.MILLISECONDS),
+                "Should not receive unexpected additional messages after all transitions");
     }
 
     // -----------------------------------------------------------------------
@@ -304,28 +340,26 @@ class WebSocketDeliveryIntegrationTest {
 
         // Subscribe only to order1's topic
         StompSession stompSession = connectAndTrack();
-        BlockingQueue<OrderResponse> messages = new LinkedBlockingQueue<>();
-
-        stompSession.subscribe(
-                "/topic/orders/" + order1.getId(),
-                new OrderResponseFrameHandler(messages));
-
-        // Allow subscription to register
-        Thread.sleep(500);
+        BlockingQueue<OrderResponse> messages = subscribeWithConfirmation(
+                stompSession, orderTopic(order1.getId()));
 
         // Transition order2 — should NOT appear on order1's topic
         orderService.transitionState(order2.getId(), OrderState.PREPARING);
 
         // Wait briefly — should NOT receive anything
-        OrderResponse unexpected = messages.poll(500, TimeUnit.MILLISECONDS);
+        OrderResponse unexpected = messages.poll(ISOLATION_WAIT_MS, TimeUnit.MILLISECONDS);
         assertNull(unexpected, "Should NOT receive updates for a different order on per-order topic");
 
         // Transition order1 — SHOULD appear
         orderService.transitionState(order1.getId(), OrderState.PREPARING);
-        OrderResponse expected = messages.poll(1, TimeUnit.SECONDS);
+        OrderResponse expected = messages.poll(DELIVERY_SLA_SECONDS, TimeUnit.SECONDS);
         assertNotNull(expected, "Should receive update for subscribed order");
         assertEquals(order1.getId(), expected.getId());
         assertEquals(OrderState.PREPARING, expected.getState());
+
+        // Confirm no unexpected additional messages
+        assertNull(messages.poll(NO_MESSAGE_WAIT_MS, TimeUnit.MILLISECONDS),
+                "Should not receive unexpected additional messages on per-order topic");
     }
 
     // -----------------------------------------------------------------------
@@ -342,28 +376,26 @@ class WebSocketDeliveryIntegrationTest {
 
         // Connect and subscribe to station topic
         StompSession stompSession = connectAndTrack();
-        BlockingQueue<OrderResponse> messages = new LinkedBlockingQueue<>();
-
-        stompSession.subscribe(
-                "/topic/stations/" + station.getId() + "/orders",
-                new OrderResponseFrameHandler(messages));
-
-        // Allow subscription to register
-        Thread.sleep(500);
+        BlockingQueue<OrderResponse> messages = subscribeWithConfirmation(
+                stompSession, stationTopic(station.getId()));
 
         // Transition order1 to PREPARING
         orderService.transitionState(order1.getId(), OrderState.PREPARING);
-        OrderResponse msg1 = messages.poll(1, TimeUnit.SECONDS);
+        OrderResponse msg1 = messages.poll(DELIVERY_SLA_SECONDS, TimeUnit.SECONDS);
         assertNotNull(msg1, "Station topic should receive update for order1");
         assertEquals(order1.getId(), msg1.getId());
         assertEquals(OrderState.PREPARING, msg1.getState());
 
         // Transition order2 to PREPARING
         orderService.transitionState(order2.getId(), OrderState.PREPARING);
-        OrderResponse msg2 = messages.poll(1, TimeUnit.SECONDS);
+        OrderResponse msg2 = messages.poll(DELIVERY_SLA_SECONDS, TimeUnit.SECONDS);
         assertNotNull(msg2, "Station topic should receive update for order2");
         assertEquals(order2.getId(), msg2.getId());
         assertEquals(OrderState.PREPARING, msg2.getState());
+
+        // Confirm no unexpected additional messages
+        assertNull(messages.poll(NO_MESSAGE_WAIT_MS, TimeUnit.MILLISECONDS),
+                "Should not receive unexpected additional messages on station topic");
     }
 
     // --- STOMP frame handler ---
@@ -392,18 +424,21 @@ class WebSocketDeliveryIntegrationTest {
     }
 
     /**
-     * No-op session handler for the STOMP connection.
+     * Session handler that logs transport and protocol errors for debugging.
      */
     private static class NoOpStompSessionHandler extends StompSessionHandlerAdapter {
+
+        private static final Logger log = LoggerFactory.getLogger(NoOpStompSessionHandler.class);
+
         @Override
         public void handleException(StompSession session, StompCommand command,
                                     StompHeaders headers, byte[] payload, Throwable exception) {
-            // Log but don't fail — test assertions handle verification
+            log.warn("STOMP protocol error [command={}]: {}", command, exception.getMessage(), exception);
         }
 
         @Override
         public void handleTransportError(StompSession session, Throwable exception) {
-            // Log but don't fail — test assertions handle verification
+            log.warn("STOMP transport error: {}", exception.getMessage(), exception);
         }
     }
 }
